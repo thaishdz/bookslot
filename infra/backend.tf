@@ -10,7 +10,7 @@ terraform {
     bucket         = "bookslot-dev-tfstate-th33"
     key            = "bookslot/dev/terraform.tfstate"
     region         = "eu-west-1"
-    dynamodb_table = "bookslot-dev-tflock"
     encrypt        = true
+    use_lockfile   = true
   }
 }
