@@ -62,7 +62,7 @@ def create_booking(event):
             if reasons[0]["Code"] == "ConditionalCheckFailed": # La posición en el array es la que identifica la operación culpable, no el código de error!!!
                 return { 
                     "statusCode": 409, 
-                    "body": json.dumps({"message": "Slot fully booked"}) 
+                    "body": json.dumps({"message": "Slot not available"}) 
                 }
             if reasons[1]["Code"] == "ConditionalCheckFailed":
                 return { 
@@ -125,4 +125,6 @@ def delete_booking(event):
                     "statusCode": 404, 
                     "body": json.dumps({"message": "Booking not found or already cancelled"}) 
                 }
+            if reasons[1]["Code"] == "ConditionalCheckFailed": 
+                return {"statusCode": 404, "body": json.dumps({"message": "Slot not found"})}
         raise
