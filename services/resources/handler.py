@@ -9,13 +9,11 @@ from decimal import Decimal
 dynamodb = boto3.resource("dynamodb")
 table = dynamodb.Table("bookslot-dev-bookings")
 
-
-
 def lambda_handler(event, context):
     # event   → todo lo que envía API Gateway (método, path, body, headers...)
     # context → metadatos de la ejecución (tiempo restante, request id...)
 
-    routeKey = event["routeKey"]   # "POST /resources"
+    routeKey = event["routeKey"]
 
     match routeKey:
         case "GET /resources":
