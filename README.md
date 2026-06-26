@@ -11,6 +11,7 @@
 - [ADR-0001: State locking nativo en S3](docs/adr/0001-state-locking-s3-native.md)
 - [ADR-0002: Modelo de datos single-table](docs/adr/0002-single-table-design.md)
 - [ADR-0003: Rol IAM de ejecución de las Lambdas](docs/adr/0003-lambda-iam-execution-role.md)
+- [ADR-0004: Control de concurrencia](docs/adr/0004-concurrency-control.md)
 
 ## Despliegue
 [#TODO] Prerrequisitos, pasos reproducibles, variables de entorno.
