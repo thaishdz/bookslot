@@ -26,21 +26,41 @@ familiar, y es, la de detectar entidades del dominio. Por eso tengo cuatro:
 - `RESOURCE 1:N SLOT` — un recurso tiene muchos slots.  
 - `SLOT 1:N BOOKING` — un slot puede recibir varias reservas hasta agotar su cupo. Esta relación existe en el dominio, pero no la dibujé en el diagrama como filas que cuelguen del slot, ya que el aforo se controla mediante el contador `BOOKED` dentro del propio slot.
 
-![diagrama-relaciones-dynamodb](assets/diagrama-tabla-dynamodb.png)
+![diagrama-relaciones-dynamodb](assets/dynamodb-table.png)
 
 ## Diseño de claves
 
 Cuando la Lambda consulta una partición, identifica el tipo de cada fila por el prefijo de su SK (`PROFILE`, `INFO`, `SLOT#`, `BOOKING#`), y puede filtrar pidiendo solo las SK que empiezan por un prefijo concreto (por ejemplo, `SLOT#` para traer únicamente los slots de un recurso).
 
-#### DNI como PK de usuario  
-Elegí el DNI y no el email porque **en DynamoDB la partition key es inmutable**.
-Si usara el email y el usuario lo cambiara, tendría que eliminar todas sus filas (perfil y reservas, que comparten la misma `PK`) y volver a crearlas con la nueva clave. El DNI nunca cambia, por lo que es una clave segura y estable.
+### Identificador de usuario como PK: del DNI al `sub` de Cognito
+
+Por razones prácticas, escogí el **DNI** como PK de usuario durante el 
+desarrollo, ya que resultaba fácilmente reconocible a nivel de tabla al ejecutar 
+las pruebas (`USER#00000001A`). Un UUID hubiera sido la opción más acertada desde el 
+principio, de hecho, es exactamente lo que Cognito emplea para generar el `sub`.
+
+Al integrar **Cognito** descubrí el atributo **`sub`**: un identificador único que 
+el proveedor de identidad genera automáticamente para cada usuario. Migré la PK a 
+`USER#<sub>` por dos motivos:
+
+1. **Garantía del proveedor**: el `sub` lo genera y mantiene Cognito — siempre 
+   existe, es único e inmutable por diseño. No depende de que el usuario aporte 
+   un dato correcto en el registro, eliminando validaciones innecesarias.
+
+2. **Privacidad**: el `sub` es un identificador anónimo que no expone datos 
+   personales. El DNI, en cambio, es un dato sensible que viajaría **legible** en 
+   el token — el payload de un JWT va codificado en base64, no cifrado, por lo que 
+   cualquiera que lo intercepte podría leerlo. Usar el `sub` como clave evita 
+   exponer el DNI en cada petición.
+
+> El DNI no desaparece del sistema: se conserva como atributo dentro del `PROFILE` 
+> del usuario en DynamoDB y como atributo custom en Cognito.
 
 ## Patrones de acceso
 
 **En DynamoDB se plantean primero los patrones de acceso** (las consultas que se harán), ya que son las que le darán forma a la tabla, por eso he detectado que estas son las que necesito:
 
-- **Reservas de un usuario** → `PK = USER#<dni>` + `SK` que empieza por `BOOKING#`→ **Consulta directa**: las reservas cuelgan del propio usuario.
+- **Reservas de un usuario** → `PK = USER#<sub>` + `SK` que empieza por `BOOKING#`→ **Consulta directa**: las reservas cuelgan del propio usuario.
 
 - **Slots de un recurso** → `PK = RESOURCE#<id>` + `SK` que empieza por `SLOT#` → **Consulta directa**: los slots cuelgan del recurso, y al llevar la fecha en la SK salen ordenados cronológicamente.
 
