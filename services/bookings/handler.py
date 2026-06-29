@@ -17,7 +17,9 @@ def lambda_handler(event, context):
     
 
 def create_booking(event):
-    booking_dict = json.loads(event["body"])
+    booking_payload = json.loads(event["body"]) # datos de la reserva
+    user_id = event["requestContext"]["authorizer"]["jwt"]["claims"]["sub"] # quien hace la reserva
+    
     try:
         dynamodb_client.transact_write_items( 
             TransactItems=[
@@ -26,8 +28,8 @@ def create_booking(event):
                         'TableName': "bookslot-dev-bookings",
                         # En la tabla bookslot-dev-bookings, sobre el slot con esta PK+SK
                         'Key': {
-                            'PK': {'S': f"RESOURCE#{booking_dict['resource_id']}"},
-                            'SK': {'S': f"SLOT#{booking_dict['datetime']}"}
+                            'PK': {'S': f"RESOURCE#{booking_payload['resource_id']}"},
+                            'SK': {'S': f"SLOT#{booking_payload['datetime']}"}
                         },
                         'UpdateExpression': 'SET #booked = #booked + :inc', # suma 1 a booked  
                         'ConditionExpression': '#booked < #capacity', # pero solo si booked < capacity,
@@ -42,9 +44,9 @@ def create_booking(event):
                     'Put': {
                         'TableName': "bookslot-dev-bookings",
                         'Item': {
-                           'PK': {'S': f"USER#{booking_dict['dni']}"},
-                           'SK': {'S': f"BOOKING#{booking_dict['datetime']}"},
-                           'resource_id': {'S': f"RESOURCE#{booking_dict['resource_id']}"},
+                           'PK': {'S': f"USER#{user_id}"},
+                           'SK': {'S': f"BOOKING#{booking_payload['datetime']}"},
+                           'resource_id': {'S': f"RESOURCE#{booking_payload['resource_id']}"},
                            'status': {'S': 'CONFIRMED'}
                         },
                         'ConditionExpression': 'attribute_not_exists(PK)'
@@ -73,7 +75,9 @@ def create_booking(event):
 
 
 def delete_booking(event):
-    booking_dict = json.loads(event["body"])
+    booking_payload = json.loads(event["body"])
+    user_id = event["requestContext"]["authorizer"]["jwt"]["claims"]["sub"]
+
     try:
         dynamodb_client.transact_write_items(
             TransactItems=[
@@ -81,8 +85,8 @@ def delete_booking(event):
                     'Update': {
                         'TableName': "bookslot-dev-bookings",
                         'Key': {
-                            'PK': {'S': f"USER#{booking_dict['dni']}"},
-                            'SK': {'S': f"BOOKING#{booking_dict['datetime']}"}
+                            'PK': {'S': f"USER#{user_id}"},
+                            'SK': {'S': f"BOOKING#{booking_payload['datetime']}"}
                         },
                     'UpdateExpression': 'SET #status = :cancelled', # pon status a CANCELLED SOLO SI
                     'ConditionExpression': '#status = :confirmed', # el status actual es CONFIRMED
@@ -97,8 +101,8 @@ def delete_booking(event):
                     'Update': {
                         'TableName': "bookslot-dev-bookings",
                         'Key': {
-                            'PK': {'S': f"RESOURCE#{booking_dict['resource_id']}"},
-                            'SK': {'S': f"SLOT#{booking_dict['datetime']}"}
+                            'PK': {'S': f"RESOURCE#{booking_payload['resource_id']}"},
+                            'SK': {'S': f"SLOT#{booking_payload['datetime']}"}
                         },
                     'UpdateExpression': 'SET #booked = #booked - :decrement', 
                     'ConditionExpression': '#booked > :zero', # lo dejo como validacion defensiva aunque es muy improbable que se dé

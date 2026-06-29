@@ -9,15 +9,13 @@ resource "aws_apigatewayv2_integration" "bookings" {
 }
 
 resource "aws_apigatewayv2_route" "bookings" {
-  for_each  = toset([
-    "POST /bookings", 
-    "DELETE /bookings", 
-    ])
-  
+  for_each  = toset(["POST /bookings", "DELETE /bookings"])
   api_id    = aws_apigatewayv2_api.main.id
   route_key = each.value
-  
   target    = "integrations/${aws_apigatewayv2_integration.bookings.id}"
+
+  authorization_type = "JWT"                                   
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
 }
 
 resource "aws_lambda_permission" "bookings_lambda_permission" {
