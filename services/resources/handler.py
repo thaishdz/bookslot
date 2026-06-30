@@ -40,7 +40,14 @@ def get_resources(event):
     }
 
 def create_resource(event):
+    claims = event["requestContext"]["authorizer"]["jwt"]["claims"]
+    groups = claims.get("cognito:groups", "")
+
+    if "admins" not in groups:
+        return { "statusCode": 403, "body": json.dumps({"message": "admin role required"}) }
+    
     resource_dict = json.loads(event["body"])
+
     try:
         table.put_item(
             Item={
@@ -59,7 +66,7 @@ def create_resource(event):
     except ClientError as error:
         if error.response["Error"]["Code"] == "ConditionalCheckFailedException":
             return { "statusCode": 409, "body": json.dumps({"message": "Resource already exists"}) }
-        raise   # si es otro error distinto, que se propague 
+    raise   # si es otro error distinto, que se propague 
 
 def get_resource_slots(event):
     resource_id = event["pathParameters"]["id"]
@@ -79,6 +86,12 @@ def decimal_default(obj):
 
 
 def create_slot(event):
+    claims = event["requestContext"]["authorizer"]["jwt"]["claims"]
+    groups = claims.get("cognito:groups", "")
+
+    if "admins" not in groups:
+        return { "statusCode": 403, "body": json.dumps({"message": "admin role required"}) }
+
     resource_id = event["pathParameters"]["id"]
     slot_dict = json.loads(event["body"])
     try:

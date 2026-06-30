@@ -40,3 +40,9 @@ resource "aws_cognito_user_pool_client" "main" {
   # Para apps públicas/sin backend confidencial
   generate_secret = false
 }
+
+resource "aws_cognito_user_group" "admins" {
+  name         = "admins"
+  user_pool_id = aws_cognito_user_pool.main.id
+  description  = "Usuarios con permiso para crear recursos y slots"
+}
