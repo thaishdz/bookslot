@@ -15,6 +15,7 @@
 - [ADR-0005: Autenticación del pipeline CI/CD con AWS](docs/adr/0005-cicd-authentication.md)
 - [ADR-0006: Bootstrap manual del backend de Terraform](docs/adr/0006-terraform-backend-bootstrap.md)
 - [ADR-0007: Autenticación y autorización con AWS Cognito](docs/adr/0007-cognito-authentication-authorization.md)
+- [ADR-0008: Observabilidad para reservas](docs/adr/0008-observability-booking-alarm.md)
 
 ## Despliegue
 [#TODO] Prerrequisitos, pasos reproducibles, variables de entorno.
