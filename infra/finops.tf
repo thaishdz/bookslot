@@ -1,5 +1,5 @@
-resource "aws_budgets_budget" "bookslot_monthly" {
-  name         = "bookslot-dev-monthly"
+resource "aws_budgets_budget" "bookslot_monthly_v2" {
+  name         = "bookslot-dev-monthly-v2"
   budget_type  = "COST"
   limit_amount = "10.0" # limite de mi cuenta de estudiante
   limit_unit   = "USD"
