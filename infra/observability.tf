@@ -4,7 +4,7 @@ resource "aws_sns_topic" "booking_errors" {
 
 resource "aws_sns_topic_subscription" "booking_errors_email" {
   topic_arn = aws_sns_topic.booking_errors.arn
-  protocol  = "http"
+  protocol  = "email"
   endpoint  = var.alarm_email
 }
 
