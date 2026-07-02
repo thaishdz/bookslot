@@ -2,9 +2,7 @@
 
 ## Contexto
 
-En un sistema de reservas existe el riesgo de **overbooking**, donde un recurso 
-con capacidad limitada acabe con más reservas de las que admite. El problema 
-surge cuando varias reservas llegan de forma **simultánea**.
+El problema surge cuando varias reservas llegan de forma **simultánea**.
 
 Un enfoque simple gestionaría cada reserva en dos pasos:
 1. **Leer** el contador de plazas ocupadas y comprobar si queda hueco.

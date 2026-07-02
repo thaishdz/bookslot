@@ -1,10 +1,23 @@
 # BookSlot
 > 🎓 Proyecto final del curso de AWS impartido por [Commit Academy](https://www.commitacademy.io/)
-## Descripción
-[#TODO] Qué es el producto, qué resuelve, el reto de la concurrencia.
+
+BookSlot es una API de reservas para recursos con aforo limitado (gimnasios, salas de coworking, etc.). Cada recurso ofrece *slots* (huecos con fecha, hora y capacidad) y los usuarios reservan plazas en ellos.
+
+El reto central del proyecto es **controlar la concurrencia**, garantizando que un slot nunca acepte más reservas de la capacidad de la que dispone, incluso cuando múltiples usuarios intentan reservar la última plaza **simultáneamente**.
 
 ## Arquitectura
-[#TODO] Diagrama de Excalidraw + breve descripción de serverless.
+
+Stack **serverless** (se paga por uso, sin coste en reposo, escalado automático):
+
+- **Cómputo:** AWS Lambda (funciones bajo demanda)
+- **API:** API Gateway (HTTP API)
+- **Base de datos:** DynamoDB (NoSQL, single-table)
+- **Autenticación:** Amazon Cognito (JWT)
+- **IaC:** Terraform
+- **CI/CD:** GitHub Actions
+- **Observabilidad:** CloudWatch (logs + alarmas) + SNS
+
+![diagrama-arquictetura-serverless](docs/assets/diagrama-arquitectura-serverless.png)
 
 ## Decisiones arquitectónicas (ADRs)
 
@@ -18,30 +31,87 @@
 - [ADR-0008: Observabilidad para reservas](docs/adr/0008-observability-booking-alarm.md)
 
 ## Despliegue
-[#TODO] Prerrequisitos, pasos reproducibles, variables de entorno.
 
-## Control de concurrencia
-[#TODO] Cómo evitamos overbooking + el script de prueba y su salida.
+### Prerrequisitos
+- Terraform >= 1.14
+- AWS CLI configurado (credenciales vía SSO / IAM Identity Center)
 
-## Seguridad
-### IAM Roles
+### Pasos
 
-La cuenta de estudiante no permite crear roles IAM propios, por lo que se reutiliza un rol preexistente.
+1. Ejecutar el script para crear el bucket S3 del tfstate (una sola vez).
 
-El **análisis completo de este trade-off** está en el [ADR-0003: Rol IAM de ejecución de las Lambdas](docs/adr/0003-lambda-iam-execution-role.md).
+```sh
+./scripts/bootstrap.sh
+```
+> Terraform no puede crear el bucket donde guarda su propio estado [ver ADR-0006](docs/adr/0006-terraform-backend-bootstrap.md).
 
-[#TODO] Secrets Manager (Cognito?), HTTPS.
+2. Inicializar Terraform: conecta con el backend remoto en S3
+
+```sh
+cd infra
+terraform init
+```
+
+3. Desplegar toda la infraestructura
+
+```sh
+terraform apply
+```
+
+### Variables
+
+Los valores sensibles o específicos del entorno se definen en `terraform.tfvars` (excluido del control de versiones):
+
+```hcl
+alarm_email = "email@example.com"   # destino de las alarmas de CloudWatch
+```
+
+> Tras un reseteo de la cuenta, el sistema se reconstruye por completo repitiendo estos tres pasos: la infraestructura es reproducible desde cero.
 
 ## Observabilidad
-[#TODO] Logs, alarmas.
+
+- **Logs:** centralizados automáticamente en CloudWatch Logs (cada Lambda emite su propio flujo).
+- **Alarma:** una alarma de CloudWatch vigila la métrica `Errors` de la Lambda `bookings` (la ruta crítica del negocio) y notifica vía **SNS** a un email de administración, tanto al fallar (`ALARM`) como al recuperarse (`OK`).
+
+Razonamiento del diseño (por qué vigilar errores y no tráfico, elección del umbral, patrón pub/sub) en el [ADR-0008](docs/adr/0008-observability-booking-alarm.md).
 
 ## FinOps
-[#TODO] Tags, AWS Budgets, estimación de coste mensual.
 
-## CI/CD
-[#TODO] Pipeline de GitHub Actions
+### Tags
+Todos los recursos llevan etiquetas (`Project`, `Environment`) aplicados vía `default_tags` en el provider, lo que permite filtrar el gasto por proyecto en Cost Explorer.
+
+### Estimación de coste
+Con el tráfico de un MVP, BookSlot opera **dentro del free tier** de AWS:
+
+| Servicio       | Uso estimado (MVP)     | Free tier                | Coste |
+|----------------|------------------------|--------------------------|-------|
+| Lambda         | ~30k req/mes           | 1M req + 400k GB-s/mes   | 0 €   |
+| DynamoDB       | ~50k req/mes, pocos MB | 200M req + 25 GB/mes     | 0 €   |
+| API Gateway    | ~30k req/mes           | 1M req/mes               | 0 €   |
+| CloudWatch/SNS | volumen mínimo         | dentro de free tier      | ~0 €  |
+| S3 (tfstate)   | pocos KB               | —                        | ~0 €  |
+
+**Coste total estimado: ~0 €/mes**, confirmado por el forecast real de AWS Budgets (0,12 $/mes previstos, 0$ gastados).
+
+El diseño serverless con capacidad *on-demand* es en sí mismo la optimización de coste: sin servidores en reposo, se paga solo por uso real.
+
+> Precios verificados en julio de 2026; consultar la [calculadora de AWS](https://calculator.aws) para valores actuales.
+
+### Control de gasto
+Un AWS Budget (`bookslot-dev-monthly`, límite 10 $/mes) con umbrales escalonados alerta por email ante desviaciones:
+- **50%** (5 $) → aviso temprano (gasto real)
+- **80%** (8 $) → alerta (gasto real)
+- **100%** (10 $) → aviso predictivo (forecast)
+
 
 ## Destrucción
-[#TODO] `terraform destroy` + eliminar manualmente el bucket S3 del estado 
-(ojo: tiene versionado, vaciar con `--force`).
 
+```sh
+cd infra
+terraform destroy
+```
+
+El bucket del `tfstate` se creó fuera de Terraform [ver ADR-0006]((docs/adr/0006-terraform-backend-bootstrap.md)), así que se elimina manualmente. Tiene versionado, así que hay que vaciarlo con `--force`:
+```sh
+aws s3 rb s3://<BUCKET_TFSTATE> --force
+```

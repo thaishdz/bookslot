@@ -26,7 +26,7 @@ familiar, y es, la de detectar entidades del dominio. Por eso tengo cuatro:
 - `RESOURCE 1:N SLOT` — un recurso tiene muchos slots.  
 - `SLOT 1:N BOOKING` — un slot puede recibir varias reservas hasta agotar su cupo. Esta relación existe en el dominio, pero no la dibujé en el diagrama como filas que cuelguen del slot, ya que el aforo se controla mediante el contador `BOOKED` dentro del propio slot.
 
-![diagrama-relaciones-dynamodb](assets/dynamodb-table.png)
+![diagrama-relaciones-dynamodb](../assets/dynamodb-table.png)
 
 ## Diseño de claves
 
