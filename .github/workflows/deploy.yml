@@ -26,9 +26,14 @@ jobs:
         working-directory: ./infra
 
       - name: Terraform Plan
-        run: terraform plan 
+        env:
+          TF_VAR_alarm_email: ${{ vars.ALARM_EMAIL }}
+        run: terraform plan -input=false
         working-directory: ./infra
 
       - name: Terraform Apply
-        run: terraform apply -auto-approve
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        env:
+          TF_VAR_alarm_email: ${{ vars.ALARM_EMAIL }}
+        run: terraform apply -auto-approve -input=false
         working-directory: ./infra
