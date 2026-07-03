@@ -3,8 +3,6 @@
 
 BookSlot es una API de reservas para recursos con aforo limitado (gimnasios, salas de coworking, etc.). Cada recurso ofrece *slots* (huecos con fecha, hora y capacidad) y los usuarios reservan plazas en ellos.
 
-El reto central del proyecto es **controlar la concurrencia**, garantizando que un slot nunca acepte más reservas de la capacidad de la que dispone, incluso cuando múltiples usuarios intentan reservar la última plaza **simultáneamente**.
-
 ## Arquitectura
 
 Stack **serverless** (se paga por uso, sin coste en reposo, escalado automático):
@@ -17,7 +15,7 @@ Stack **serverless** (se paga por uso, sin coste en reposo, escalado automático
 - **CI/CD:** GitHub Actions
 - **Observabilidad:** CloudWatch (logs + alarmas) + SNS
 
-![diagrama-arquictetura-serverless](docs/assets/diagrama-arquitectura-serverless.png)
+![diagrama-arquictetura-serverless](docs/assets/diagrama-reservas.png)
 
 ## Decisiones arquitectónicas (ADRs)
 
@@ -29,6 +27,32 @@ Stack **serverless** (se paga por uso, sin coste en reposo, escalado automático
 - [ADR-0006: Bootstrap manual del backend de Terraform](docs/adr/0006-terraform-backend-bootstrap.md)
 - [ADR-0007: Autenticación y autorización con AWS Cognito](docs/adr/0007-cognito-authentication-authorization.md)
 - [ADR-0008: Observabilidad para reservas](docs/adr/0008-observability-booking-alarm.md)
+
+## Control de concurrencia
+
+El reto central del proyecto es **controlar la concurrencia**, garantizando que un slot nunca acepte más reservas de la capacidad de la que dispone, incluso cuando múltiples usuarios intentan reservar la última plaza **simultáneamente**.
+
+**El problema — race condition:**
+Un enfoque simple (leer el contador → comprobar → escribir) falla bajo 
+concurrencia: si 5 requests leen "quedan 3 slots" al mismo tiempo, las 5 
+confirman la reserva → **overbooking**.
+
+![Problema de concurrencia](docs/assets/problema-concurrencia.png)
+
+**La solución — transacción atómica:**
+Cada reserva es un `transact_write_items` con dos operaciones que se aplican 
+o fallan juntas:
+1. `booked += 1` en el slot, **solo si** `booked < capacity` (ConditionExpression).
+2. Crear la reserva, **solo si** no existe ya (idempotencia).
+
+DynamoDB serializa internamente las escrituras concurrentes: ante N requests 
+simultáneas, solo las que encuentran `booked < capacity` pasan; el resto 
+reciben `409`.
+
+![Solución de concurrencia](docs/assets/solucion-concurrencia.png)
+
+**Validación:** `scripts/test-concurrency.sh` lanza 5 reservas en paralelo 
+(`xargs -P`) sobre un slot con `capacity: 2`:
 
 ## Despliegue
 
@@ -60,20 +84,20 @@ terraform apply
 
 ### Variables
 
-Los valores sensibles o específicos del entorno se definen en `terraform.tfvars` (excluido del control de versiones):
+Los valores sensibles o específicos del entorno se definen en `terraform.tfvars` (excluido en `.gitignore`):
 
 ```hcl
 alarm_email = "email@example.com"   # destino de las alarmas de CloudWatch
 ```
-
-> Tras un reseteo de la cuenta, el sistema se reconstruye por completo repitiendo estos tres pasos: la infraestructura es reproducible desde cero.
 
 ## Observabilidad
 
 - **Logs:** centralizados automáticamente en CloudWatch Logs (cada Lambda emite su propio flujo).
 - **Alarma:** una alarma de CloudWatch vigila la métrica `Errors` de la Lambda `bookings` (la ruta crítica del negocio) y notifica vía **SNS** a un email de administración, tanto al fallar (`ALARM`) como al recuperarse (`OK`).
 
-Razonamiento del diseño (por qué vigilar errores y no tráfico, elección del umbral, patrón pub/sub) en el [ADR-0008](docs/adr/0008-observability-booking-alarm.md).
+Razonamiento del diseño: por qué vigilar errores y no tráfico, elección del umbral, patrón pub/sub en el [ADR-0008](docs/adr/0008-observability-booking-alarm.md).
+
+![Flujo-observabilidad](docs/assets/flujo-observabilidad.png)
 
 ## FinOps
 
@@ -83,19 +107,20 @@ Todos los recursos llevan etiquetas (`Project`, `Environment`) aplicados vía `d
 ### Estimación de coste
 Con el tráfico de un MVP, BookSlot opera **dentro del free tier** de AWS:
 
-| Servicio       | Uso estimado (MVP)     | Free tier                | Coste |
-|----------------|------------------------|--------------------------|-------|
-| Lambda         | ~30k req/mes           | 1M req + 400k GB-s/mes   | 0 €   |
-| DynamoDB       | ~50k req/mes, pocos MB | 200M req + 25 GB/mes     | 0 €   |
-| API Gateway    | ~30k req/mes           | 1M req/mes               | 0 €   |
-| CloudWatch/SNS | volumen mínimo         | dentro de free tier      | ~0 €  |
-| S3 (tfstate)   | pocos KB               | —                        | ~0 €  |
+| Servicio       | Uso estimado (MVP)  | Free tier              | Coste |
+|----------------|---------------------|------------------------|-------|
+| Lambda         | ~100 req/mes        | 1M req + 400k GB-s/mes | 0 €   |
+| DynamoDB       | ~200 ops/mes        | 200M req + 25 GB/mes   | 0 €   |
+| API Gateway    | ~100 req/mes        | 1M req/mes             | 0 €   |
+| CloudWatch/SNS | volumen mínimo      | dentro de free tier    | ~0 €  |
+| S3 (tfstate)   | pocos KB            | —                      | ~0 €  |
 
-**Coste total estimado: ~0 €/mes**, confirmado por el forecast real de AWS Budgets (0,12 $/mes previstos, 0$ gastados).
+**Coste total estimado: ~0 €/mes** — el sistema completo opera dentro del free 
+tier con el tráfico real de un MVP académico (~100 req/mes). 
 
-El diseño serverless con capacidad *on-demand* es en sí mismo la optimización de coste: sin servidores en reposo, se paga solo por uso real.
+El forecast de **AWS Budgets confirma 0.12$/mes previstos y 0$ gastados**.
 
-> Precios verificados en julio de 2026; consultar la [calculadora de AWS](https://calculator.aws) para valores actuales.
+>NOTE: Precios verificados en julio de 2026
 
 ### Control de gasto
 Un AWS Budget (`bookslot-dev-monthly`, límite 10 $/mes) con umbrales escalonados alerta por email ante desviaciones:
