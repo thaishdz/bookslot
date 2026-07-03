@@ -33,9 +33,9 @@ Stack **serverless** (se paga por uso, sin coste en reposo, escalado automático
 El reto central del proyecto es **controlar la concurrencia**, garantizando que un slot nunca acepte más reservas de la capacidad de la que dispone, incluso cuando múltiples usuarios intentan reservar la última plaza **simultáneamente**.
 
 **El problema — race condition:**
-Un enfoque simple (leer el contador → comprobar → escribir) falla bajo 
-concurrencia: si 5 requests leen "quedan 3 slots" al mismo tiempo, las 5 
-confirman la reserva → **overbooking**.
+El enfoque simple de leer el contador → comprobar → escribir falla bajo 
+concurrencia, de modo que, si 5 requests leen "quedan 3 slots" al mismo tiempo, las 5 
+confirman la reserva lo que da lugar al **overbooking**.
 
 ![Problema de concurrencia](docs/assets/problema-concurrencia.png)
 
