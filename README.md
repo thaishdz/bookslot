@@ -15,7 +15,7 @@ Stack **serverless** (se paga por uso, sin coste en reposo, escalado automático
 - **CI/CD:** GitHub Actions
 - **Observabilidad:** CloudWatch (logs + alarmas) + SNS
 
-![diagrama-arquictetura-serverless](docs/assets/diagrama-reservas.png)
+![diagrama-arquictetura-serverless](docs/assets/flujo-reserva.png)
 
 ## Decisiones arquitectónicas (ADRs)
 

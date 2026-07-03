@@ -15,6 +15,8 @@ contador **antes** de que la otra lo haya actualizado, ambas ven el mismo valor
 **condición de carrera** (*race condition*), es decir, el resultado depende del orden 
 en que se entrelazan las operaciones.
 
+![problema-concurrencia](../assets/problema-concurrencia.png)
+
 Ejemplo: una actividad con 3 plazas libres recibe 7 peticiones a la vez. Si 
 todas leen "quedan plazas" antes de que ninguna haya escrito, el sistema 
 confirma las 7 reservas para 3 plazas. El sistema no se entera de que se 
@@ -54,6 +56,8 @@ la condición; la otra la ve ya incumplida y es rechazada.
 
 Se opta por la **operación atómica condicional** (Opción 2), descartando el 
 locking por su coste en rendimiento y complejidad.
+
+![problema-concurrencia](../assets/solucion-concurrencia.png)
 
 Sin embargo, una reserva no implica una única escritura, sino **dos** que deben 
 ocurrir juntas:
