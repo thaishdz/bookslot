@@ -1,7 +1,7 @@
 # BookSlot
-> 🎓 Proyecto final del curso de AWS impartido por [Commit Academy](https://www.commitacademy.io/)
+> 🎓 Proyecto final del curso de AWS & Cloud impartido por [Commit Academy](https://www.commitacademy.io/)
 
-BookSlot es una API de reservas para recursos con aforo limitado (gimnasios, salas de coworking, etc.). Cada recurso ofrece *slots* (huecos con fecha, hora y capacidad) y los usuarios reservan plazas en ellos.
+BookSlot es una API que permite reservar espacios que cuenten con aforo limitado como gimnasios o salas de coworking. Cada recurso ofrece *slots* (huecos con fecha, hora y capacidad) y los usuarios reservan plazas en ellos.
 
 ## Arquitectura
 
